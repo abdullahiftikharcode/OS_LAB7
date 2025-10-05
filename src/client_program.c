@@ -29,6 +29,7 @@ int signup(ClientState* client, const char* username, const char* password);
 int login(ClientState* client, const char* username, const char* password);
 int upload_file(ClientState* client, const char* filename);
 int download_file(ClientState* client, const char* filename);
+int receive_file_data(ClientState* client, const char* filename);
 int delete_file(ClientState* client, const char* filename);
 int list_files(ClientState* client);
 void interactive_mode(ClientState* client);
@@ -208,26 +209,94 @@ int upload_file(ClientState* client, const char* filename) {
 }
 
 int download_file(ClientState* client, const char* filename) {
-    char command[256];
+    char command[512];
     snprintf(command, sizeof(command), "DOWNLOAD %s %s\n", client->username, filename);
     
     if (send_command(client, command) < 0) {
         return -1;
     }
 
+    // For download, we need to handle the response and file data together
+    return receive_file_data(client, filename);
+}
+
+int receive_file_data(ClientState* client, const char* filename) {
+    // First receive the response message
     char response[1024];
     if (receive_response(client, response, sizeof(response)) < 0) {
         return -1;
     }
-
+    
     printf("Download response: %s", response);
     
-    if (strncmp(response, "OK", 2) == 0) {
-        // In a real implementation, the server would send the file data here
-        // For now, we just show the response
-        return 0;
+    if (strncmp(response, "OK", 2) != 0) {
+        printf("Download failed: %s", response);
+        return -1;
     }
-    return -1;
+    
+    // Now receive the file data header
+    char buffer[1024];
+    ssize_t bytes_received = recv(client->socket_fd, buffer, sizeof(buffer) - 1, 0);
+    if (bytes_received <= 0) {
+        printf("Failed to receive file data header\n");
+        return -1;
+    }
+    
+    buffer[bytes_received] = '\0';
+    
+    // Parse file header: "FILE_DATA filename size\n"
+    char received_filename[256];
+    long file_size;
+    if (sscanf(buffer, "FILE_DATA %255s %ld", received_filename, &file_size) != 2) {
+        printf("Invalid file data header: %s\n", buffer);
+        return -1;
+    }
+    
+    printf("Receiving file: %s (size: %ld bytes)\n", received_filename, file_size);
+    
+    // Create output file
+    char output_filename[512];
+    snprintf(output_filename, sizeof(output_filename), "downloaded_%s", filename);
+    int output_fd = open(output_filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (output_fd < 0) {
+        perror("Failed to create output file");
+        return -1;
+    }
+    
+    // Calculate remaining data to receive (subtract header size)
+    long header_size = strlen(buffer);
+    long remaining_bytes = file_size;
+    
+    // Write any remaining data from the first buffer
+    if (bytes_received > header_size) {
+        ssize_t data_bytes = bytes_received - header_size;
+        write(output_fd, buffer + header_size, data_bytes);
+        remaining_bytes -= data_bytes;
+    }
+    
+    // Receive remaining file data
+    char data_buffer[8192];
+    while (remaining_bytes > 0) {
+        size_t buffer_size = sizeof(data_buffer);
+        ssize_t to_read = (remaining_bytes > (long)buffer_size) ? buffer_size : (size_t)remaining_bytes;
+        
+        printf("Waiting to receive %ld more bytes...\n", remaining_bytes);
+        ssize_t bytes_read = recv(client->socket_fd, data_buffer, to_read, 0);
+        
+        if (bytes_read <= 0) {
+            printf("Failed to receive file data (bytes_read: %ld)\n", bytes_read);
+            close(output_fd);
+            return -1;
+        }
+        
+        printf("Received %ld bytes\n", bytes_read);
+        write(output_fd, data_buffer, bytes_read);
+        remaining_bytes -= bytes_read;
+    }
+    
+    close(output_fd);
+    printf("File downloaded successfully as: %s\n", output_filename);
+    return 0;
 }
 
 int delete_file(ClientState* client, const char* filename) {

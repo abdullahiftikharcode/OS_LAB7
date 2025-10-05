@@ -1,0 +1,38 @@
+# Compiled binaries
+server
+client
+server_debug
+client_debug
+server_tsan
+
+# Object files
+*.o
+*.a
+*.so
+
+# Test reports
+reports/*.txt
+reports/*.log
+reports/tsan_report.txt*
+reports/valgrind_report.txt
+
+# Temporary test files
+test_file_*.txt
+test_upload*.txt
+
+# Storage directory (user data)
+storage/*/
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Keep README files in reports directory
+!reports/README.md

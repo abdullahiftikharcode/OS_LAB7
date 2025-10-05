@@ -13,6 +13,12 @@ Run
 ---
 `./server 9090`
 
+Client
+------
+`./client [host] [port]`
+
+See `CLIENT_README.md` for detailed client usage.
+
 Protocol (temporary, line-based):
 - SIGNUP <user> <pass>
 - LOGIN <user> <pass>
@@ -27,5 +33,21 @@ Design
 - Client thread pool parses commands and enqueues `Task*` to a global task queue.
 - Worker thread pool executes filesystem ops and enqueues `Response*` into the per-client response queue entry.
 - Client threads block on their response queue and write back to the socket.
+
+Testing
+-------
+**Memory Leaks & Race Conditions:**
+
+```bash
+# Test for memory leaks
+./testing/run_valgrind_simple.sh
+
+# Test for race conditions (automated)
+./testing/run_tsan_simple.sh
+```
+
+See `testing/README.md` for complete testing documentation.
+
+**Test Reports:** All reports are saved in `reports/` directory.
 
 

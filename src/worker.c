@@ -4,6 +4,7 @@
 #include "user.h"
 #include <stdlib.h>
 #include <string.h>
+<<<<<<< HEAD
 #include <unistd.h>
 #include <sys/stat.h>
 #include <stdio.h>
@@ -11,6 +12,11 @@
 // Forward declarations
 static void send_response(Queue *resp_map, int client_id, ResponseStatus st, const char *msg);
 static void send_file_data(int socket_fd, const char *file_path, const char *filename);
+=======
+
+// Forward declaration
+static void send_response(Queue *resp_map, int client_id, ResponseStatus st, const char *msg);
+>>>>>>> 46fe509ab8b271fddaa8c1943bb7d1d8624904bb
 
 static void send_response(Queue *resp_map, int client_id, ResponseStatus st, const char *msg) {
 	Response *r = (Response *)calloc(1, sizeof(Response));
@@ -30,6 +36,7 @@ static void send_response(Queue *resp_map, int client_id, ResponseStatus st, con
 	if (entry) queue_push(&entry->queue, r); else free(r);
 }
 
+<<<<<<< HEAD
 static void send_file_data(int socket_fd, const char *file_path, const char *filename) {
 	FILE *file = fopen(file_path, "rb");
 	if (!file) return;
@@ -54,6 +61,8 @@ static void send_file_data(int socket_fd, const char *file_path, const char *fil
 	fclose(file);
 }
 
+=======
+>>>>>>> 46fe509ab8b271fddaa8c1943bb7d1d8624904bb
 void *worker_thread_main(void *arg) {
 	WorkerPoolArg *wpa = (WorkerPoolArg *)arg;
 	while (1) {
@@ -84,6 +93,7 @@ void *worker_thread_main(void *arg) {
 			case CMD_DOWNLOAD: {
 				char p[512];
 				bool ok = fs_download_path(wpa->user_store, t->username, t->path, p, sizeof(p), err, sizeof(err));
+<<<<<<< HEAD
 				if (ok) {
 					// Send response first, then file data
 					send_response(wpa->resp_queues, t->client.client_id, RESP_OK, "downloaded");
@@ -94,6 +104,9 @@ void *worker_thread_main(void *arg) {
 				} else {
 					send_response(wpa->resp_queues, t->client.client_id, RESP_ERR, err);
 				}
+=======
+				send_response(wpa->resp_queues, t->client.client_id, ok?RESP_OK:RESP_ERR, ok?p:err);
+>>>>>>> 46fe509ab8b271fddaa8c1943bb7d1d8624904bb
 				break;
 			}
 			case CMD_DELETE: {

@@ -6,10 +6,7 @@
 #include "types.h"
 #include "user.h"
 
-typedef struct ResponseQueueEntry {
-	int client_id;
-	Queue queue; // responses for this client
-} ResponseQueueEntry;
+// ResponseQueueEntry is defined in queue.h
 
 typedef struct ServerState {
 	Queue task_queue;

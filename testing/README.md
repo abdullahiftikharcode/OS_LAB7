@@ -1,6 +1,206 @@
 # Testing Directory
 
-This directory contains all testing scripts and documentation for the multi-threaded file storage server.
+This directory contains comprehensive test scripts and utilities for the OS Lab 7 project.
+
+## Quick Start
+
+### Run All Tests (Recommended)
+```bash
+# Python version (more reliable, cross-platform)
+python3 testing/comprehensive_test.py
+
+# Bash version (Linux/macOS/WSL)
+chmod +x testing/comprehensive_test.sh
+./testing/comprehensive_test.sh
+```
+
+### Individual Tests
+
+**Memory Leak Testing (Valgrind):**
+```bash
+chmod +x testing/run_valgrind_simple.sh
+./testing/run_valgrind_simple.sh
+```
+
+**Race Condition Testing (ThreadSanitizer):**
+```bash
+chmod +x testing/run_tsan_simple.sh
+./testing/run_tsan_simple.sh
+```
+
+## Test Scripts
+
+### comprehensive_test.py
+**Recommended for all platforms**
+
+Comprehensive Python test script that verifies:
+- Compilation (standard, debug, tsan builds)
+- Server startup and shutdown
+- User registration (SIGNUP)
+- User authentication (LOGIN)
+- File upload (UPLOAD) with encoding
+- File listing (LIST)
+- File download (DOWNLOAD) with decoding
+- File deletion (DELETE)
+- Concurrent operations (thread safety)
+- Encoding/Decoding (BONUS)
+- Priority system (BONUS)
+- Stress testing (20+ concurrent clients)
+- Error handling
+
+**Usage:**
+```bash
+python3 testing/comprehensive_test.py
+```
+
+**Requirements:**
+- Python 3.6+
+- Server must be built (`make`)
+
+### comprehensive_test.sh
+Bash version of comprehensive test script.
+
+**Usage:**
+```bash
+chmod +x testing/comprehensive_test.sh
+./testing/comprehensive_test.sh
+```
+
+**Requirements:**
+- Bash shell
+- nc (netcat) command
+- Standard Unix utilities
+
+### run_valgrind_simple.sh
+Tests for memory leaks using Valgrind.
+
+**What it tests:**
+- Memory allocation/deallocation
+- Memory leaks (definitely lost, indirectly lost)
+- Invalid memory access
+- Use of uninitialized values
+
+**Expected Result:**
+```
+LEAK SUMMARY:
+   definitely lost: 0 bytes in 0 blocks
+   indirectly lost: 0 bytes in 0 blocks
+ERROR SUMMARY: 0 errors from 0 contexts
+```
+
+**Usage:**
+```bash
+./testing/run_valgrind_simple.sh
+```
+
+### run_tsan_simple.sh
+Tests for race conditions using ThreadSanitizer.
+
+**What it tests:**
+- Data races between threads
+- Deadlocks
+- Thread synchronization issues
+- Concurrent access problems
+
+**Expected Result:**
+```
+ SUCCESS: No race conditions detected!
+```
+
+**Usage:**
+```bash
+./testing/run_tsan_simple.sh
+```
+
+### test_client.sh
+Basic functional test script.
+
+**Usage:**
+```bash
+chmod +x testing/test_client.sh
+./testing/test_client.sh
+```
+
+### tsan_test_client.py
+Python helper for ThreadSanitizer testing.
+
+## Test Reports
+
+All test reports are saved in the `reports/` directory:
+- `valgrind_report.txt` - Valgrind memory leak report
+- `tsan_report.txt*` - ThreadSanitizer race condition reports
+
+## Testing Checklist
+
+Before submission, ensure all tests pass:
+
+- [ ] `python3 testing/comprehensive_test.py` - All tests pass
+- [ ] `./testing/run_valgrind_simple.sh` - No memory leaks
+- [ ] `./testing/run_tsan_simple.sh` - No race conditions
+- [ ] Server handles 20+ concurrent clients
+- [ ] All file operations work correctly
+- [ ] Priority system orders tasks correctly
+- [ ] Files are encoded/decoded properly
+
+## Troubleshooting
+
+### "Address already in use"
+Wait a few seconds for the port to be released, or kill existing server:
+```bash
+pkill -9 server
+```
+
+### "Connection refused"
+Ensure server is running:
+```bash
+ps aux | grep server
+```
+
+### Python tests fail with "ModuleNotFoundError"
+Ensure Python 3 is installed:
+```bash
+python3 --version
+```
+
+### Valgrind shows "still reachable" blocks
+This is normal for SQLite and pthread libraries. Focus on "definitely lost" which should be 0.
+
+### ThreadSanitizer shows warnings
+Review the specific warning in `reports/tsan_report.txt*` and fix the synchronization issue.
+
+## Manual Testing
+
+If automated tests fail, you can test manually:
+
+**Terminal 1 - Server:**
+```bash
+./server 9090
+```
+
+**Terminal 2 - Client:**
+```bash
+./client 127.0.0.1 9090
+```
+
+Then enter commands:
+```
+SIGNUP testuser testpass
+LOGIN testuser testpass
+UPLOAD testuser file.txt 100 /tmp/test.txt
+LIST testuser
+DOWNLOAD testuser file.txt
+DELETE testuser file.txt
+QUIT
+```
+
+## Performance Benchmarks
+
+Expected performance on typical hardware:
+- **Throughput**: 100+ operations/second
+- **Latency**: < 50ms per operation
+- **Concurrent Clients**: 50+ simultaneous
+- **Memory Usage**: < 50MB with 10 clients
+- **CPU Usage**: < 5% when idleaded file storage server.
 
 ## Quick Start
 

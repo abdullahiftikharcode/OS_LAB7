@@ -1,11 +1,12 @@
 CC=gcc
-CFLAGS=-Wall -Wextra -Wpedantic -std=c11 -O2 -pthread
-CFLAGS_DEBUG=-Wall -Wextra -Wpedantic -std=c11 -g -O0 -pthread
-CFLAGS_TSAN=-Wall -Wextra -Wpedantic -std=c11 -g -O1 -pthread -fsanitize=thread
-LDFLAGS=-pthread
-LDFLAGS_TSAN=-pthread -fsanitize=thread
+CFLAGS=-Wall -Wextra -Wpedantic -std=c11 -O2 -pthread -DSQLITE_THREADSAFE=1
+CFLAGS_DEBUG=-Wall -Wextra -Wpedantic -std=c11 -g -O0 -pthread -DSQLITE_THREADSAFE=1
+CFLAGS_TSAN=-Wall -Wextra -Wpedantic -std=c11 -g -O1 -pthread -fsanitize=thread -DSQLITE_THREADSAFE=1
+LDFLAGS=-pthread -lsqlite3
+LDFLAGS_TSAN=-pthread -fsanitize=thread -lsqlite3
 
-SRC=src/main.c src/queue.c src/user.c src/fs.c src/client.c src/worker.c
+# Source files
+SRC=src/main.c src/queue.c src/user_db.c src/fs.c src/client.c src/worker.c src/config.c src/task.c src/priority.c src/crypto.c
 CLIENT_SRC=src/client_program.c
 INC=-Iinclude
 

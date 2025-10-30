@@ -25,7 +25,7 @@ typedef struct {
 int connect_to_server(const char* host, int port);
 int send_command(ClientState* client, const char* command);
 int receive_response(ClientState* client, char* response, size_t response_size);
-int signup(ClientState* client, const char* username, const char* password);
+int signup(ClientState* client, const char* username, const char* password, const char* priority);
 int login(ClientState* client, const char* username, const char* password);
 int upload_file(ClientState* client, const char* filename);
 int download_file(ClientState* client, const char* filename);
@@ -91,9 +91,15 @@ int receive_response(ClientState* client, char* response, size_t response_size) 
     return 0;
 }
 
-int signup(ClientState* client, const char* username, const char* password) {
+int signup(ClientState* client, const char* username, const char* password, const char* priority) {
     char command[256];
-    snprintf(command, sizeof(command), "SIGNUP %s %s\n", username, password);
+    
+    // Include priority if specified, otherwise use default (NORMAL)
+    if (priority && strlen(priority) > 0) {
+        snprintf(command, sizeof(command), "SIGNUP %s %s %s\n", username, password, priority);
+    } else {
+        snprintf(command, sizeof(command), "SIGNUP %s %s NORMAL\n", username, password);
+    }
     
     if (send_command(client, command) < 0) {
         return -1;
@@ -340,16 +346,17 @@ void interactive_mode(ClientState* client) {
     char command[64];
     char arg1[256];
     char arg2[256];
+    char arg3[256];
     
     printf("\n=== File Storage Client ===\n");
     printf("Available commands:\n");
-    printf("  signup <username> <password>  - Create new account\n");
-    printf("  login <username> <password>   - Login to account\n");
-    printf("  upload <filename>            - Upload file\n");
-    printf("  download <filename>          - Download file\n");
-    printf("  delete <filename>            - Delete file\n");
-    printf("  list                         - List files\n");
-    printf("  quit                         - Exit\n\n");
+    printf("  signup <username> <password> [priority]  - Create new account (priority: HIGH, NORMAL, LOW)\n");
+    printf("  login <username> <password>              - Login to account\n");
+    printf("  upload <filename>                        - Upload file\n");
+    printf("  download <filename>                      - Download file\n");
+    printf("  delete <filename>                        - Delete file\n");
+    printf("  list                                     - List files\n");
+    printf("  quit                                     - Exit\n\n");
     
     while (1) {
         printf("> ");
@@ -366,17 +373,19 @@ void interactive_mode(ClientState* client) {
             continue;
         }
         
-        int parsed = sscanf(input, "%63s %255s %255s", command, arg1, arg2);
+        int parsed = sscanf(input, "%63s %255s %255s %255s", command, arg1, arg2, arg3);
         
         if (strcmp(command, "quit") == 0) {
             send_command(client, "QUIT\n");
             break;
         } else if (strcmp(command, "signup") == 0) {
             if (parsed < 3) {
-                printf("Usage: signup <username> <password>\n");
+                printf("Usage: signup <username> <password> [priority]\n");
+                printf("Priority options: HIGH, NORMAL (default), LOW\n");
                 continue;
             }
-            signup(client, arg1, arg2);
+            // arg3 contains priority if provided (parsed >= 4)
+            signup(client, arg1, arg2, parsed >= 4 ? arg3 : "NORMAL");
         } else if (strcmp(command, "login") == 0) {
             if (parsed < 3) {
                 printf("Usage: login <username> <password>\n");

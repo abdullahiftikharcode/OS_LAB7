@@ -3,11 +3,14 @@
 
 #include <pthread.h>
 #include <stdbool.h>
+#include <sqlite3.h>
+#include "priority.h"
 
 typedef struct User {
 	char name[64];
 	char pass[64];
 	pthread_mutex_t mutex; // per-user lock
+	TaskPriority priority; // user's priority level
 	size_t used_bytes;
 	size_t quota_bytes;
 } User;
@@ -17,21 +20,19 @@ typedef struct UserNode {
 	struct UserNode *next;
 } UserNode;
 
-typedef struct UserStore {
-	UserNode *head;
-	pthread_mutex_t users_mutex;
-	char storage_root[256];
-	size_t user_count;
-} UserStore;
+// Forward declaration for opaque type
+typedef struct UserStore UserStore;
 
 // API functions
 UserStore* user_store_create(const char *root);
 void user_store_destroy(UserStore *store);
-bool user_store_signup(UserStore *store, const char *name, const char *pass, size_t quota_bytes);
+bool user_store_signup(UserStore *store, const char *name, const char *pass, size_t quota_bytes, TaskPriority priority);
 bool user_store_login(UserStore *store, const char *name, const char *pass);
 User* user_store_lock_user(UserStore *store, const char *name);
 void user_store_unlock_user(User *user);
 const char* user_store_get_root(UserStore *store);
+TaskPriority user_get_priority(User *user);
+void user_set_priority(User *user, TaskPriority priority);
 
 #endif
 

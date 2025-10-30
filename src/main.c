@@ -2,6 +2,7 @@
 #include "client.h"
 #include "worker.h"
 #include "user.h"
+#include "config.h"
 #include "queue.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,6 +11,7 @@
 #include <unistd.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <libgen.h>
 
 ServerState *g_server = NULL;
 
@@ -36,40 +38,82 @@ static int tcp_listen(unsigned short port) {
 }
 
 static ResponseQueueEntry *register_client_response_queue(ServerState *server, int client_id) {
-	ResponseQueueEntry *e = (ResponseQueueEntry *)calloc(1, sizeof(ResponseQueueEntry));
-	e->client_id = client_id;
-	queue_init(&e->queue);
-	queue_push(&server->response_map, e);
-	return e;
+    ResponseQueueEntry *e = (ResponseQueueEntry *)calloc(1, sizeof(ResponseQueueEntry));
+    if (!e) return NULL;
+    
+    e->client_id = client_id;
+    queue_init(&e->queue);
+    pthread_mutex_init(&e->mutex, NULL);
+    pthread_cond_init(&e->response_available, NULL);
+    
+    // Add to response map (queue_push handles its own locking)
+    bool success = queue_push(&server->response_map, e, PRIORITY_NORMAL);
+    
+    if (!success) {
+        pthread_cond_destroy(&e->response_available);
+        pthread_mutex_destroy(&e->mutex);
+        queue_destroy(&e->queue);
+        free(e);
+        return NULL;
+    }
+    
+    return e;
 }
 
 // remove entry from response map
 void deregister_client_response_queue(ServerState *server, int client_id) {
     pthread_mutex_lock(&server->response_map.mutex);
-    QueueNode *prev = NULL, *cur = server->response_map.head;
-    while (cur) {
-        ResponseQueueEntry *e = (ResponseQueueEntry *)cur->data;
+    
+    // Search through the priority queue items
+    ResponseQueueEntry *found = NULL;
+    size_t found_idx = 0;
+    for (size_t i = 0; i < server->response_map.size; i++) {
+        ResponseQueueEntry *e = (ResponseQueueEntry *)server->response_map.items[i].data;
         if (e->client_id == client_id) {
-            if (prev) prev->next = cur->next; else server->response_map.head = cur->next;
-            if (server->response_map.tail == cur) server->response_map.tail = prev;
-            server->response_map.size--;
-            pthread_mutex_unlock(&server->response_map.mutex);
-            queue_close(&e->queue);
-            queue_destroy(&e->queue);
-            free(e);
-            free(cur);
-            return;
+            found = e;
+            found_idx = i;
+            break;
         }
-        prev = cur; cur = cur->next;
     }
-    pthread_mutex_unlock(&server->response_map.mutex);
+    
+    if (found) {
+        // Remove from queue by replacing with last element and reducing size
+        if (found_idx < server->response_map.size - 1) {
+            server->response_map.items[found_idx] = server->response_map.items[server->response_map.size - 1];
+        }
+        server->response_map.size--;
+        pthread_mutex_unlock(&server->response_map.mutex);
+        
+        // Clean up the entry
+        pthread_mutex_lock(&found->mutex);
+        queue_close(&found->queue);
+        pthread_cond_broadcast(&found->response_available);  // Wake up any waiting threads
+        pthread_mutex_unlock(&found->mutex);
+        
+        // Destroy resources
+        queue_destroy(&found->queue);
+        pthread_cond_destroy(&found->response_available);
+        pthread_mutex_destroy(&found->mutex);
+        free(found);
+    } else {
+        pthread_mutex_unlock(&server->response_map.mutex);
+    }
 }
 
 int main(int argc, char **argv) {
 	unsigned short port = 9090;
 	int client_threads = 4;
 	int worker_threads = 4;
+	// Parse command line arguments
+	char *config_file = "config.ini";
 	if (argc > 1) port = (unsigned short)atoi(argv[1]);
+	if (argc > 2) config_file = argv[2];
+	
+	// Initialize configuration
+	config_init(config_file);
+	
+	// Get storage path from config
+	const char *storage_path = config_get_storage_path();
 	
 	// Create server state
 	ServerState *server = (ServerState *)calloc(1, sizeof(ServerState));
@@ -78,7 +122,7 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 	
-	server->user_store = user_store_create("storage");
+	server->user_store = user_store_create(storage_path);
 	if (!server->user_store) {
 		fprintf(stderr, "Failed to create user store\n");
 		free(server);
@@ -112,12 +156,18 @@ int main(int argc, char **argv) {
         if (cfd < 0) {
             if (!server->running) break; else continue;
         }
+		printf("[Main] Accepted connection (fd=%d, client_id=%d)\n", cfd, next_client_id);
+		fflush(stdout);
 		cta.client_id = next_client_id;
 		register_client_response_queue(server, next_client_id);
 		ClientInfo *ci = (ClientInfo *)calloc(1, sizeof(ClientInfo));
 		ci->socket_fd = cfd; ci->client_id = next_client_id;
 		next_client_id++;
-		queue_push(&client_queue, ci);
+		printf("[Main] About to push to client_queue at %p\n", (void*)&client_queue);
+		fflush(stdout);
+		queue_push(&client_queue, ci, PRIORITY_NORMAL);
+		printf("[Main] Pushed client to queue (client_id=%d)\n", next_client_id - 1);
+		fflush(stdout);
 	}
 
 	// Shutdown sequence: close queues to wake up waiting threads
@@ -129,16 +179,19 @@ int main(int argc, char **argv) {
 	for (int i=0;i<worker_threads;i++) pthread_join(wts[i], NULL);
 	free(wts);
 	
+	// Clean up configuration
+	// Note: config_cleanup() would be called here if we had one
+	
 	// Clean up remaining response queue entries
 	pthread_mutex_lock(&server->response_map.mutex);
-	QueueNode *n = server->response_map.head;
-	while (n) {
-		QueueNode *next = n->next;
-		ResponseQueueEntry *e = (ResponseQueueEntry *)n->data;
-		queue_destroy(&e->queue);
-		free(e);
-		free(n);
-		n = next;
+	for (size_t i = 0; i < server->response_map.size; i++) {
+		ResponseQueueEntry *e = (ResponseQueueEntry *)server->response_map.items[i].data;
+		if (e) {
+			queue_destroy(&e->queue);
+			pthread_cond_destroy(&e->response_available);
+			pthread_mutex_destroy(&e->mutex);
+			free(e);
+		}
 	}
 	pthread_mutex_unlock(&server->response_map.mutex);
 	

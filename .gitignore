@@ -36,3 +36,7 @@ Thumbs.db
 
 # Keep README files in reports directory
 !reports/README.md
+
+EXECUTION_FLOW.md
+
+zCODE_WALKTHROUGH.md

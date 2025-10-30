@@ -8,17 +8,74 @@
 ## 1. Design Report
 
 ### System Architecture
-- **Main Thread**: Accepts incoming client connections and enqueues `ClientInfo*` to a client queue.
-- **Client Thread Pool**: Parses client commands and enqueues `Task*` to a global task queue.
-- **Worker Thread Pool**: Executes filesystem operations and enqueues `Response*` to per-client response queues.
-- **Client Threads**: Block on their respective response queues and send responses back to clients.
+
+#### 1.1 Thread Structure
+- **Main Thread**
+  - Initializes server components and thread pools
+  - Listens for incoming client connections
+  - Distributes client connections to the client thread pool
+  - Handles graceful shutdown procedures
+
+- **Client Thread Pool** (4 threads by default)
+  - Each thread manages multiple client connections
+  - Parses incoming commands into `Task` structures
+  - Manages client state and authentication
+  - Handles response delivery back to clients
+
+- **Worker Thread Pool** (4 threads by default)
+  - Processes tasks from the global task queue
+  - Executes filesystem operations (read/write/delete)
+  - Manages user authentication and file operations
+  - Sends responses back through the response queue system
+
+#### 1.2 Data Structures
+- **Task Queue**
+  - Thread-safe FIFO queue for pending operations
+  - Shared between client and worker threads
+  - Implements producer-consumer pattern with condition variables
+
+- **Response Queues**
+  - Per-client response queues for command results
+  - Ensures ordered response delivery
+  - Implements timeout and error handling
+
+- **User Store**
+  - Manages user authentication and file permissions
+  - Implements thread-safe user session management
+  - Handles user home directory structure
+
+#### 1.3 File System Layer
+- **Virtual File System**
+  - Abstracts physical file operations
+  - Implements user quota management
+  - Handles concurrent access to shared resources
+  - Provides atomic operations for file modifications
 
 ### Key Features
-- Multi-threaded server with thread pooling
-- Concurrent client handling
-- Thread-safe task queue implementation
-- Graceful shutdown handling
-- Memory leak and race condition prevention
+
+#### 2.1 Concurrency Control
+- Fine-grained locking strategy
+- Deadlock prevention mechanisms
+- Thread-safe memory management
+- Non-blocking I/O operations where applicable
+
+#### 2.2 Error Handling
+- Comprehensive error reporting
+- Graceful degradation under load
+- Resource cleanup on error conditions
+- Client disconnection handling
+
+#### 2.3 Security
+- Secure password hashing
+- File permission enforcement
+- Input validation and sanitization
+- Protection against path traversal attacks
+
+#### 2.4 Performance
+- Configurable thread pool sizes
+- Efficient memory management
+- Minimized critical sections
+- Asynchronous I/O operations
 
 ## 2. Communication Mechanism
 

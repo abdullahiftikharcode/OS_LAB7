@@ -1,9 +1,9 @@
 # Operating Systems Lab 7 - File Server
 
 ## 0. Group Members
-- [Full Name 1] (Roll Number 1)
-- [Full Name 2] (Roll Number 2)
-- [Full Name 3] (Roll Number 3)
+- M.Abdullah Iftikhar (BSCS-23070)
+- Waqas Sohaib (BSCS-23173)
+- Abdul Moiz (BSCS-23118)
 
 ## 1. Design Report
 
